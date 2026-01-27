@@ -1,7 +1,7 @@
 import cv2
 import mediapipe as mp
 
-
+#测试文件，不参与主循环
 class BodyController:
     def __init__(self, detection_confidence=0.7):
         self.mp_pose = mp.solutions.pose
@@ -63,6 +63,8 @@ class BodyController:
 if __name__ == "__main__":
     cap = cv2.VideoCapture(0)
     handler = BodyController()
+    window_name = "Body Mode Test"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     while True:
         ret, frame = cap.read()
         if not ret: break
@@ -77,7 +79,9 @@ if __name__ == "__main__":
         cv2.line(img, (0, int(h * 0.3)), (w, int(h * 0.3)), (0, 255, 255), 2)  # Jump Line
         cv2.line(img, (0, int(h * 0.7)), (w, int(h * 0.7)), (0, 255, 255), 2)  # Duck Line
 
-        cv2.imshow("Body Mode Test", img)
+        cv2.imshow(window_name, img)
+        if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+            break
         if cv2.waitKey(1) & 0xFF == 27: break
     cap.release()
     cv2.destroyAllWindows()

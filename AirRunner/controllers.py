@@ -3,12 +3,14 @@ import mediapipe as mp
 import math
 
 # ==========================================
-# 🏃 模块 1: 全身控制 (BodyController)
+# 模块 1: 全身控制 (BodyController)
 # ==========================================
 class BodyController:
     def __init__(self, detection_confidence=0.7):
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
+            model_complexity=0,
+            smooth_landmarks=False,
             min_detection_confidence=detection_confidence,
             min_tracking_confidence=0.5
         )
@@ -16,17 +18,19 @@ class BodyController:
         self.current_action = "NEUTRAL"
 
     def process(self, frame, draw=False):
+        frame.flags.writeable = False
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.pose.process(frame_rgb)
+        frame.flags.writeable = True
 
         action = "NEUTRAL"
         body_data = None
 
-        # 阈值设定
-        JUMP_THRESH = 0.3  # 肩膀高于画面 30% 处算跳
-        DUCK_THRESH = 0.7  # 肩膀低于画面 70% 处算蹲
-        LEFT_THRESH = 0.4  # 髋部偏左
-        RIGHT_THRESH = 0.6 # 髋部偏右
+        # 阈值设定 (上下更敏感，左右保持 0.4 ~ 0.6)
+        JUMP_THRESH = 0.46  # 鼻尖高于画面 45% 处算跳
+        DUCK_THRESH = 0.56  # 鼻尖低于画面 53% 处算蹲
+        LEFT_THRESH = 0.45   # 鼻尖偏左
+        RIGHT_THRESH = 0.55  # 鼻尖偏右
 
         if results.pose_landmarks:
             if draw:
@@ -35,24 +39,20 @@ class BodyController:
             landmarks = results.pose_landmarks.landmark
 
             # 获取关键点
-            left_shoulder_y = landmarks[11].y
-            right_shoulder_y = landmarks[12].y
-            center_shoulder_y = (left_shoulder_y + right_shoulder_y) / 2
+            # 使用鼻尖作为控制点 (0: nose)
+            nose_x = landmarks[0].x
+            nose_y = landmarks[0].y
 
-            left_hip_x = landmarks[23].x
-            right_hip_x = landmarks[24].x
-            center_hip_x = (left_hip_x + right_hip_x) / 2
-
-            body_data = (int(center_hip_x * frame.shape[1]), int(center_shoulder_y * frame.shape[0]))
+            body_data = (int(nose_x * frame.shape[1]), int(nose_y * frame.shape[0]))
 
             # 判定逻辑
-            if center_shoulder_y < JUMP_THRESH:
+            if nose_y < JUMP_THRESH:
                 action = "JUMP"
-            elif center_shoulder_y > DUCK_THRESH:
+            elif nose_y > DUCK_THRESH:
                 action = "DUCK"
-            elif center_hip_x < LEFT_THRESH:
+            elif nose_x < LEFT_THRESH:
                 action = "LEFT"
-            elif center_hip_x > RIGHT_THRESH:
+            elif nose_x > RIGHT_THRESH:
                 action = "RIGHT"
             else:
                 action = "NEUTRAL"
@@ -61,12 +61,13 @@ class BodyController:
 
 
 # ==========================================
-# 🖐 模块 2: 手势控制 (HandController)
+# 模块 2: 手势控制 (HandController)
 # ==========================================
 class HandController:
     def __init__(self, detection_confidence=0.7):
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
+            model_complexity=0,
             max_num_hands=1,
             min_detection_confidence=detection_confidence,
             min_tracking_confidence=0.5
@@ -85,16 +86,18 @@ class HandController:
         return folded_fingers >= 3
 
     def process(self, frame, draw=False):
+        frame.flags.writeable = False
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(frame_rgb)
+        frame.flags.writeable = True
 
         h, w, _ = frame.shape
         action = "NEUTRAL"
         landmark_data = None 
 
         # 定义中心安全区
-        x_min, x_max = 0.3, 0.7
-        y_min, y_max = 0.3, 0.7
+        x_min, x_max = 0.4, 0.6
+        y_min, y_max = 0.4, 0.6
 
         if results.multi_hand_landmarks:
             for hand_lms in results.multi_hand_landmarks:

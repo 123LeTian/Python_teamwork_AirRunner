@@ -26,8 +26,20 @@ GAME_URLS = {
 def run_game_loop(mode_type):
     print(f">>> 正在启动 {mode_type} 模式...")
     
-    # Mac 修复：强制使用默认后端
-    cap = cv2.VideoCapture(0)
+    # 摄像头后端与分辨率优化 (Windows 优先 DSHOW)
+    if sys.platform.startswith("win"):
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    else:
+        cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    window_name = "AirRunner - Camera View"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(window_name, 480, 360)
+    cv2.moveWindow(window_name, 20, 20)
+    if hasattr(cv2, "WND_PROP_TOPMOST"):
+        cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
     
     hud = CyberHUD()
     adapter = GameAdapter()
@@ -59,10 +71,17 @@ def run_game_loop(mode_type):
 
         # 4. 显示画面
         # 为了方便演示，我们把窗口稍微缩小一点，放在左上角
-        cv2.imshow('AirRunner - Camera View', frame)
+        cv2.imshow(window_name, frame)
 
+        # 如果用户手动关闭窗口，直接退出循环
+        if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+            break
+
+        key = cv2.waitKey(5) & 0xFF
+        if key == 32:  # SPACE
+            adapter.press_key("space")
         # 按 ESC 退出
-        if cv2.waitKey(5) & 0xFF == 27:
+        if key == 27:
             break
 
     cap.release()
@@ -103,7 +122,13 @@ class App(ctk.CTk):
         self.main_area.grid(row=0, column=1, sticky="nsew")
 
         # --- 标题 ---
-        ctk.CTkLabel(self.main_area, text="请配置游戏环境", font=ctk.CTkFont(size=28, weight="bold")).pack(pady=(40, 20))
+        ctk.CTkLabel(self.main_area, text="请配置游戏环境", font=ctk.CTkFont(size=28, weight="bold")).pack(pady=(40, 10))
+        ctk.CTkLabel(
+            self.main_area,
+            text="提示：若要关闭摄像头窗口，请点击窗口后按 ESC 键",
+            font=ctk.CTkFont(size=20, weight="bold"),
+            text_color="#FFD166",
+        ).pack(pady=(0, 20))
 
         # --- ⭐ 新增：游戏选择下拉框 ---
         self.game_frame = ctk.CTkFrame(self.main_area, fg_color="transparent")
@@ -137,7 +162,7 @@ class App(ctk.CTk):
         # 全身卡片
         self.card_body = ctk.CTkFrame(self.main_area, height=120, fg_color=("#2CC985", "#2FA572"))
         self.card_body.pack(fill="x", padx=80, pady=10)
-        ctk.CTkLabel(self.card_body, text="🏃 全身运动模式", font=ctk.CTkFont(size=20, weight="bold"), text_color="white").pack(anchor="w", padx=20, pady=(15, 0))
+        ctk.CTkLabel(self.card_body, text="😄 面部转动模式", font=ctk.CTkFont(size=20, weight="bold"), text_color="white").pack(anchor="w", padx=20, pady=(15, 0))
         self.btn_body = ctk.CTkButton(self.card_body, text="启动 >", fg_color="white", text_color="#2FA572", width=100,
                                       command=self.select_body_mode)
         self.btn_body.pack(anchor="e", padx=20, pady=10)
