@@ -2,7 +2,7 @@ import cv2
 import mediapipe as mp
 import math
 
-
+#测试文件，不参与主循环
 class HandController:
     def __init__(self, detection_confidence=0.7):
         # 初始化 MediaPipe Hands
