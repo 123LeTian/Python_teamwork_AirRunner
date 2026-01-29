@@ -19,7 +19,7 @@ class BodyController:
         action = "NEUTRAL"
         body_data = None
 
-        # 阈值设定 (根据实际测试调整)
+        # 阈值设定
         JUMP_THRESH = 0.3  # 肩膀高于画面 30% 处算跳
         DUCK_THRESH = 0.7  # 肩膀低于画面 70% 处算蹲
         LEFT_THRESH = 0.4  # 髋部偏左

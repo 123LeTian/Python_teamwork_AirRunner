@@ -66,7 +66,7 @@ class HandController:
                     if cy < y_min:
                         action = "JUMP"  # 手向上移
                     elif cy > y_max:
-                        action = "DUCK"  # 手向下移 (滑铲)
+                        action = "DUCK"  # 手向下移
                     elif cx < x_min:
                         action = "LEFT"  # 镜像后，手向画面左边移
                     elif cx > x_max:
@@ -78,7 +78,7 @@ class HandController:
         return action, frame, landmark_data
 
 
-# --- 本地测试代码 (仅 Member A 自测用) ---
+# --- 本地测试代码 ---
 if __name__ == "__main__":
     cap = cv2.VideoCapture(0)
     handler = HandController()

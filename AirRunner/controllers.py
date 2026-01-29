@@ -1,23 +1,41 @@
 import cv2
 import mediapipe as mp
-import math
 
-# ==========================================
-# 模块 1: 全身控制 (BodyController)
-# ==========================================
-class BodyController:
-    def __init__(self, detection_confidence=0.7):
+
+class BaseController:
+    """ 控制器基类，用于统一管理阈值 """
+
+    def __init__(self, settings=None):
+        # 默认设置
+        self.settings = {
+            "jump_thresh": 0.4,
+            "duck_thresh": 0.6,
+            "left_thresh": 0.4,
+            "right_thresh": 0.6
+        }
+        if settings:
+            self.settings.update(settings)
+
+    def get_thresholds(self):
+        return {
+            "jump": self.settings["jump_thresh"],
+            "duck": self.settings["duck_thresh"],
+            "left": self.settings["left_thresh"],
+            "right": self.settings["right_thresh"]
+        }
+
+
+class BodyController(BaseController):
+    def __init__(self, detection_confidence=0.7, settings=None):
+        super().__init__(settings)
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
             model_complexity=0,
-            smooth_landmarks=False,
             min_detection_confidence=detection_confidence,
             min_tracking_confidence=0.5
         )
-        self.mp_draw = mp.solutions.drawing_utils
-        self.current_action = "NEUTRAL"
 
-    def process(self, frame, draw=False):
+    def process(self, frame):
         frame.flags.writeable = False
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.pose.process(frame_rgb)
@@ -26,45 +44,31 @@ class BodyController:
         action = "NEUTRAL"
         body_data = None
 
-        # 阈值设定 (上下更敏感，左右保持 0.4 ~ 0.6)
-        JUMP_THRESH = 0.46  # 鼻尖高于画面 45% 处算跳
-        DUCK_THRESH = 0.56  # 鼻尖低于画面 53% 处算蹲
-        LEFT_THRESH = 0.45   # 鼻尖偏左
-        RIGHT_THRESH = 0.55  # 鼻尖偏右
+        # 读取设置
+        s = self.settings
 
         if results.pose_landmarks:
-            if draw:
-                self.mp_draw.draw_landmarks(frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
-
             landmarks = results.pose_landmarks.landmark
+            # 鼻尖控制
+            nose = landmarks[0]
+            x, y = nose.x, nose.y
+            body_data = (int(x * frame.shape[1]), int(y * frame.shape[0]))
 
-            # 获取关键点
-            # 使用鼻尖作为控制点 (0: nose)
-            nose_x = landmarks[0].x
-            nose_y = landmarks[0].y
-
-            body_data = (int(nose_x * frame.shape[1]), int(nose_y * frame.shape[0]))
-
-            # 判定逻辑
-            if nose_y < JUMP_THRESH:
+            if y < s["jump_thresh"]:
                 action = "JUMP"
-            elif nose_y > DUCK_THRESH:
+            elif y > s["duck_thresh"]:
                 action = "DUCK"
-            elif nose_x < LEFT_THRESH:
+            elif x < s["left_thresh"]:
                 action = "LEFT"
-            elif nose_x > RIGHT_THRESH:
+            elif x > s["right_thresh"]:
                 action = "RIGHT"
-            else:
-                action = "NEUTRAL"
 
-        return action, frame, body_data
+        return action, body_data
 
 
-# ==========================================
-# 模块 2: 手势控制 (HandController)
-# ==========================================
-class HandController:
-    def __init__(self, detection_confidence=0.7):
+class HandController(BaseController):
+    def __init__(self, detection_confidence=0.7, settings=None):
+        super().__init__(settings)
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             model_complexity=0,
@@ -72,53 +76,40 @@ class HandController:
             min_detection_confidence=detection_confidence,
             min_tracking_confidence=0.5
         )
-        self.mp_draw = mp.solutions.drawing_utils
-        self.current_action = "NEUTRAL"
 
-    def is_fist(self, landmarks):
-        """ 简单的握拳检测 """
-        tips = [8, 12, 16]
-        pips = [6, 10, 14]
-        folded_fingers = 0
-        for tip, pip in zip(tips, pips):
-            if landmarks[tip].y > landmarks[pip].y: 
-                folded_fingers += 1
-        return folded_fingers >= 3
-
-    def process(self, frame, draw=False):
+    def process(self, frame):
         frame.flags.writeable = False
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(frame_rgb)
         frame.flags.writeable = True
 
-        h, w, _ = frame.shape
         action = "NEUTRAL"
-        landmark_data = None 
-
-        # 定义中心安全区
-        x_min, x_max = 0.4, 0.6
-        y_min, y_max = 0.4, 0.6
+        hand_data = None
+        s = self.settings
+        h, w, _ = frame.shape
 
         if results.multi_hand_landmarks:
             for hand_lms in results.multi_hand_landmarks:
-                if draw:
-                    self.mp_draw.draw_landmarks(frame, hand_lms, self.mp_hands.HAND_CONNECTIONS)
+                # 握拳检测
+                tips = [8, 12, 16]
+                pips = [6, 10, 14]
+                folded = sum([1 for t, p in zip(tips, pips) if hand_lms.landmark[t].y > hand_lms.landmark[p].y])
 
-                # 获取中指根部作为核心控制点
+                # 中指根部坐标
                 lm = hand_lms.landmark[9]
                 cx, cy = lm.x, lm.y
-                landmark_data = (int(cx * w), int(cy * h)) # 转回像素坐标
+                hand_data = (int(cx * w), int(cy * h))
 
-                # 1. 优先检测握拳 (暂停)
-                if self.is_fist(hand_lms.landmark):
+                if folded >= 3:
                     action = "PAUSE"
                 else:
-                    # 2. 坐标判定逻辑
-                    if cy < y_min: action = "JUMP"
-                    elif cy > y_max: action = "DUCK"
-                    elif cx < x_min: action = "LEFT"
-                    elif cx > x_max: action = "RIGHT"
-                    else: action = "NEUTRAL"
+                    if cy < s["jump_thresh"]:
+                        action = "JUMP"
+                    elif cy > s["duck_thresh"]:
+                        action = "DUCK"
+                    elif cx < s["left_thresh"]:
+                        action = "LEFT"
+                    elif cx > s["right_thresh"]:
+                        action = "RIGHT"
 
-        self.current_action = action
-        return action, frame, landmark_data
+        return action, hand_data
