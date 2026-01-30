@@ -1,7 +1,7 @@
 import sys
 import time
 import threading
-
+from utils import AudioManager
 
 def _load_input_backend():
     if sys.platform.startswith("win"):
@@ -51,7 +51,7 @@ class GameAdapter:
         }
         self.start_time = time.time()
 
-        # 针对 pyautogui 移除默认延迟
+        # 针对pyautogui移除默认延迟
         if self.backend == "pyautogui":
             self.input_lib.PAUSE = 0
 
@@ -73,23 +73,25 @@ class GameAdapter:
     def execute(self, action):
         current_time = time.time()
 
-        # 1. 过滤
+        # 过滤：如果是中立或未检测到人，重置状态
         if action == "NEUTRAL" or action == "NO_HAND":
             self.last_action = "NEUTRAL"
             return
 
-        # 必须回到中立
+        # 防止连发，必须回中才能再次触发
         if self.last_action != "NEUTRAL":
             return
 
-        # 2. 冷却
+        # 冷却：防止抖动导致的误触
         if current_time - self.last_action_time < self.cooldown:
             return
 
-        # 3. 执行
+        # 执行动作
         if action in self.key_map:
             key = self.key_map[action]
-            # print(f">>> [{self.backend}] Async Press: {key}")
+
+            # 播放对应的音效
+            AudioManager.play(action)
 
             # 启动守护线程按键
             t = threading.Thread(target=self._press_worker, args=(key,))

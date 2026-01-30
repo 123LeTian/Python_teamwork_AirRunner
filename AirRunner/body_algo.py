@@ -1,7 +1,6 @@
 import cv2
 import mediapipe as mp
 
-#测试文件，不参与主循环
 class BodyController:
     def __init__(self, detection_confidence=0.7):
         self.mp_pose = mp.solutions.pose
@@ -20,10 +19,10 @@ class BodyController:
         body_data = None
 
         # 阈值设定
-        JUMP_THRESH = 0.3  # 肩膀高于画面 30% 处算跳
-        DUCK_THRESH = 0.7  # 肩膀低于画面 70% 处算蹲
+        JUMP_THRESH = 0.3  # 肩膀高于画面30%处算跳
+        DUCK_THRESH = 0.7  # 肩膀低于画面70%处算蹲
         LEFT_THRESH = 0.4  # 髋部偏左
-        RIGHT_THRESH = 0.6  # 髋部偏右
+        RIGHT_THRESH = 0.6 # 髋部偏右
 
         if results.pose_landmarks:
             if draw:
@@ -32,12 +31,12 @@ class BodyController:
             landmarks = results.pose_landmarks.landmark
 
             # 获取关键点
-            # 11: 左肩, 12: 右肩 -> 计算肩膀中心 Y
+            # 计算肩膀中心Y
             left_shoulder_y = landmarks[11].y
             right_shoulder_y = landmarks[12].y
             center_shoulder_y = (left_shoulder_y + right_shoulder_y) / 2
 
-            # 23: 左髋, 24: 右髋 -> 计算髋部中心 X
+            # 计算髋部中心X
             left_hip_x = landmarks[23].x
             right_hip_x = landmarks[24].x
             center_hip_x = (left_hip_x + right_hip_x) / 2
@@ -59,7 +58,7 @@ class BodyController:
         return action, frame, body_data
 
 
-# --- 本地测试代码 ---
+# 本地测试代码
 if __name__ == "__main__":
     cap = cv2.VideoCapture(0)
     handler = BodyController()

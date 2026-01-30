@@ -3,7 +3,6 @@ import mediapipe as mp
 
 
 class BaseController:
-    """ 控制器基类，用于统一管理阈值 """
 
     def __init__(self, settings=None):
         # 默认设置

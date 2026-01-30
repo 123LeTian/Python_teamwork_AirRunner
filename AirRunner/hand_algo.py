@@ -2,10 +2,9 @@ import cv2
 import mediapipe as mp
 import math
 
-#测试文件，不参与主循环
 class HandController:
     def __init__(self, detection_confidence=0.7):
-        # 初始化 MediaPipe Hands
+        # 初始化
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             max_num_hands=1,
@@ -18,26 +17,19 @@ class HandController:
         self.current_action = "NEUTRAL"
 
     def is_fist(self, landmarks):
-        """
-        简单的握拳检测：如果食指、中指、无名指的指尖(Tip)都在指关节(Pip)下方(Y坐标更大)，视为握拳
-        注意：OpenCV坐标系中，Y轴向下增加
-        """
-        # 指尖: 8, 12, 16; 指关节: 6, 10, 14
+        # 简单的握拳测试
+        # 指尖:8,12,16，指关节:6,10,14
         tips = [8, 12, 16]
         pips = [6, 10, 14]
 
         folded_fingers = 0
         for tip, pip in zip(tips, pips):
-            if landmarks[tip].y > landmarks[pip].y:  # 指尖在关节下面
+            if landmarks[tip].y > landmarks[pip].y:
                 folded_fingers += 1
 
-        return folded_fingers >= 3  # 3根手指弯曲算握拳
+        return folded_fingers >= 3 # 3根手指弯曲算握拳
 
     def process(self, frame, draw=False):
-        """
-        输入视频帧，返回动作指令和处理后的图像
-        指令集: JUMP, DUCK, LEFT, RIGHT, PAUSE, NEUTRAL
-        """
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(frame_rgb)
 
@@ -45,7 +37,7 @@ class HandController:
         action = "NEUTRAL"
         landmark_data = None  # 传给UI绘制用
 
-        # 定义中心安全区 (屏幕中间的 30% - 70% 区域)
+        # 定义中心安全区
         x_min, x_max = 0.3, 0.7
         y_min, y_max = 0.3, 0.7
 
@@ -54,15 +46,15 @@ class HandController:
                 if draw:
                     self.mp_draw.draw_landmarks(frame, hand_lms, self.mp_hands.HAND_CONNECTIONS)
 
-                # 获取关键点：我们用手腕(0)或中指根部(9)作为控制核心，这里用中指根部更稳定
+                # 获取关键点
                 cx, cy = hand_lms.landmark[9].x, hand_lms.landmark[9].y
                 landmark_data = (cx, cy)  # 归一化坐标
 
-                # 1. 优先检测握拳 (暂停)
+                # 优先检测握拳(暂停)
                 if self.is_fist(hand_lms.landmark):
                     action = "PAUSE"
                 else:
-                    # 2. 坐标判定逻辑 (虚拟摇杆)
+                    # 坐标判定逻辑(虚拟摇杆)
                     if cy < y_min:
                         action = "JUMP"  # 手向上移
                     elif cy > y_max:
@@ -70,7 +62,7 @@ class HandController:
                     elif cx < x_min:
                         action = "LEFT"  # 镜像后，手向画面左边移
                     elif cx > x_max:
-                        action = "RIGHT"  # 镜像后，手向画面右边移
+                        action = "RIGHT" # 镜像后，手向画面右边移
                     else:
                         action = "NEUTRAL"
 
@@ -78,7 +70,7 @@ class HandController:
         return action, frame, landmark_data
 
 
-# --- 本地测试代码 ---
+# 本地测试代码
 if __name__ == "__main__":
     cap = cv2.VideoCapture(0)
     handler = HandController()
