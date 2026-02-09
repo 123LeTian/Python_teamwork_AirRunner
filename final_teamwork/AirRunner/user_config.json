@@ -1,0 +1,9 @@
+{
+    "jump_thresh": 0.52,
+    "duck_thresh": 0.7,
+    "left_thresh": 0.37,
+    "right_thresh": 0.59,
+    "camera_index": 0,
+    "theme_mode": "Light",
+    "sound_enabled": true
+}
